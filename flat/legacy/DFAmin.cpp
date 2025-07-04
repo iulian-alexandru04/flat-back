@@ -212,6 +212,25 @@ public:
                 out<<i<<"\t"<<d[i][j].dest<<"\t"<<d[i][j].sim<<"\n";
     }
 
+    void graphviz()
+        {
+            out<<"digraph finite_state_machine {\n";
+            out<<"    fontname=\"Helvetica,Arial,sans-serif\"\n";
+            out<<"    node [fontname=\"Helvetica,Arial,sans-serif\"]\n";
+            out<<"    edge [fontname=\"Helvetica,Arial,sans-serif\"]\n";
+            out<<"    rankdir=LR;\n";
+            out<<"    node [shape = circle style=filled fillcolor=\"lightcyan\"]; "<<Start<<";\n";
+            out<<"    node [shape = doublecircle style=filled fillcolor=\"navy\" fontcolor=\"white\"];";
+            for(int i=0;i<NrFinale;i++)
+                    out<<" "<<StariFinale[i];
+            out<<";\n	node [shape = circle style=\"\" color=\"black\" fontcolor=\"black\"];\n";
+
+            for(int i=0;i<NrStari;i++)
+                for(size_t j=0;j<d[i].size();j++)
+                    out<<"    "<<i<<" -> "<<d[i][j].dest<<" [label = \""<<d[i][j].sim<<"\"];\n";
+            out<<"}";
+        }
+
 };
 int main()
 {
@@ -221,8 +240,8 @@ int main()
         initial.citire();
     }
     catch(int){cout<<"Eroare\n";}
-    initial.del_unreach();
-    initial.separabile();
-    initial.afis();
+    //initial.del_unreach();
+    //initial.separabile();
+    initial.graphviz();
     return 0;
 }
