@@ -1,203 +1,122 @@
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class FSM {
-    private int stateCount, Start;
-    private Set<Character> simbolset = new HashSet<>();
+    private int stateCount, start;
+    private Set<Character> alphabet = new HashSet<>();
     private List<Integer> finalStates = new ArrayList<>();
-    private List<Transition>[] transitions;
-
-    boolean find(int a, int b, char c) {
-        System.out.println("find with a = " + a + ", b = " + b + ", c = " + c);
-        Transition primita = new Transition(b, c);
-        for (int i = 0; i < transitions[a].size(); i++)
-            if (transitions[a].get(i).equals(primita)) {
-                System.out.println("find ok");
-                return true;
-            }
-        System.out.println("find ok");
-        return false;
-
-    }
+    private Set<Transition>[] transitions;
 
     void removeState(int x) {
         // Remove all transitions to state x and update destination indices
-        for (int i = 0; i < stateCount; i++) {
-            for (int j = 0; j < transitions[i].size(); j++) {
-                if (transitions[i].get(j).destination == x) {
-                    transitions[i].remove(j);
-                    j--;
-                } else if (transitions[i].get(j).destination > x) {
-                    var temp = new Transition(transitions[i].get(j).destination - 1, transitions[i].get(j).symbol);
-                    transitions[i].set(j, temp);
-                }
-            }
-        }
+        for (int i = 0; i < stateCount; i++)
+            transitions[i] = transitions[i].stream()
+                    .filter(t -> t.destination() != x)
+                    .map(t -> t.destination() < x ? t : new Transition(t.destination() - 1, t.symbol()))
+                    .collect(Collectors.toSet());
+
         transitions[x].clear();
         // Shift states after x
-        for (int i = x + 1; i < stateCount; i++) {
-            List<Transition> temp = transitions[i];
-            transitions[i] = transitions[i - 1];
-            transitions[i - 1] = temp;
-        }
+        for (int i = x + 1; i < stateCount; i++)
+            transitions[i - 1] = transitions[i];
+
         // Update final states
-        int finalStatesCount = finalStates.size();
-        for (int i = 0; i < finalStatesCount; i++) {
-            if (finalStates.get(i) > x) {
-                finalStates.set(i, finalStates.get(i) - 1);
-            } else if (finalStates.get(i) == x) {
-                finalStates.remove(i);
-                i--;
-                finalStatesCount--;
-            }
-        }
+        finalStates = finalStates.stream()
+                .filter(s -> s != x)
+                .map(s -> s > x ? s - 1 : s)
+                .toList();
         stateCount--;
     }
 
     void mergeState(int x, int y) { // x < y
-        // Update transitions: redirect y to x, decrement destinations > y
-        for (int i = 0; i < stateCount; i++) {
-            for (int j = 0; j < transitions[i].size(); j++) {
-                if (transitions[i].get(j).destination == y) {
-                    Transition updated = new Transition(x, transitions[i].get(j).symbol);
-                    transitions[i].set(j, updated);
-                } else if (transitions[i].get(j).destination > y) {
-                    Transition updated = new Transition(transitions[i].get(j).destination - 1, transitions[i].get(j).symbol);
-                    transitions[i].set(j, updated);
-                }
-            }
-        }
-        // Move transitions from y to x, avoid duplicates
-        while (!transitions[y].isEmpty()) {
-            Transition temp = transitions[y].get(transitions[y].size() - 1);
-            transitions[y].remove(transitions[y].size() - 1);
-            if (!transitions[x].contains(temp)) {
-                transitions[x].add(temp);
-            }
-        }
-        transitions[y].clear();
-        // Shift states after y
-        for (int i = y + 1; i < stateCount; i++) {
-            List<Transition> tmp = transitions[i];
-            transitions[i] = transitions[i - 1];
-            transitions[i - 1] = tmp;
-        }
-        // Update final states
-        int finalStatesCount = finalStates.size();
-        for (int i = 0; i < finalStatesCount; i++) {
-            if (finalStates.get(i) > y) {
-                finalStates.set(i, finalStates.get(i) - 1);
-            } else if (finalStates.get(i) == y) {
-                finalStates.remove(i);
-                i--;
-                finalStatesCount--;
-            }
-        }
-        stateCount--;
+        // redirect incoming into y towards x
+        for (int i = 0; i < stateCount; i++)
+            for (int j = 0; j < transitions[i].size(); j++)
+                transitions[i] = transitions[i].stream()
+                        .map(t -> t.destination() == y ? new Transition(x, t.symbol()) : t)
+                        .collect(Collectors.toSet());
+
+        // outgoings of y will start from x
+        transitions[x] = Stream.concat(transitions[x].stream(), transitions[y].stream()).collect(Collectors.toSet());
+        removeState(y);
     }
 
-    int getDestination(int x, char c) {
-        for (int i = 0; i < transitions[x].size(); i++) {
-            if (transitions[x].get(i).symbol == c)
-                return transitions[x].get(i).destination;
-        }
-        return -1;
-    }
-
-    boolean isFinal(int x) {
-        for (int i = 0; i < finalStates.size(); i++) {
-            if (finalStates.get(i) == x)
-                return true;
-        }
-        return false;
+    Optional<Integer> getDestination(int x, char c) {
+        return transitions[x].stream()
+                .filter(t -> t.symbol() == c)
+                .map(Transition::destination)
+                .findFirst();
     }
 
     public void read(Scanner in) throws IOException {
-        int a, b;
-        char c;
-
-        System.out.println("before states count");
         stateCount = in.nextInt();
-        System.out.println("after states count");
-        Start = in.nextInt();
+        start = in.nextInt();
         int finalStatesCount = in.nextInt();
-        for (int i = 1; i <= finalStatesCount; i++) {
-            b = in.nextInt();
-            finalStates.add(b);
+        for (int i = 1; i <= finalStatesCount; i++)
+            finalStates.add(in.nextInt());
+
+        transitions = new HashSet[stateCount + 1];
+        for (int i = 0; i <= stateCount; i++) {
+            transitions[i] = new HashSet<>();
         }
 
-        System.out.println("before read transitions");
-        transitions = new ArrayList[stateCount + 1];
-        for(int i = 0; i <= stateCount; i++) {
-            transitions[i] = new ArrayList<>();
-        }
         int transitionsCount = in.nextInt();
         for (int i = 1; i <= transitionsCount; i++) {
-            a = in.nextInt();
-            b = in.nextInt();
-            c = in.next().charAt(0);
-            if (find(a, b, c))
-                throw new RuntimeException("Duplicate transition");
-            var initialNode = transitions[a];
-            initialNode.add(new Transition(b, c));
-            simbolset.add(c);
+            int from = in.nextInt();
+            int to = in.nextInt();
+            char symbol = in.next().charAt(0);
+            transitions[from].add(new Transition(to, symbol));
+            alphabet.add(symbol);
         }
-        System.out.println("after read transitions");
-        if (transitionsCount != stateCount * simbolset.size())
+        if (transitionsCount != stateCount * alphabet.size())
             throw new RuntimeException("Invalid DFA: not complete");
     }
 
-    void delUnreach() {
+    void removeUnreachableStates() {
         boolean[] reach = new boolean[stateCount + 1];
-        for (int i = 0; i < stateCount; i++)
-            reach[i] = false;
         Queue<Integer> q = new LinkedList<>();
-        q.add(Start);
-        reach[Start] = true;
+        q.add(start);
+        reach[start] = true;
         while (!q.isEmpty()) {
             int x = q.poll();
-            for (int i = 0; i < transitions[x].size(); i++) {
-                if (!reach[transitions[x].get(i).destination]) {
-                    reach[transitions[x].get(i).destination] = true;
-                    q.add(transitions[x].get(i).destination);
+            for (Transition t : transitions[x]) {
+                if (!reach[t.destination]) {
+                    reach[t.destination] = true;
+                    q.add(t.destination);
                 }
             }
         }
-        int vechi = stateCount;
-        for (int i = 0; i < vechi; i++)
+        int oldCount = stateCount;
+        for (int i = 0; i < oldCount; i++)
             if (!reach[i])
-                removeState(i - vechi + stateCount);
+                removeState(i + stateCount - oldCount);
     }
 
     void separabile() {
         boolean[][] separ = new boolean[stateCount + 1][stateCount + 1];
-        for (int i = 0; i < stateCount; i++) {
-            for (int j = 0; j < stateCount; j++) {
-                if (isFinal(i) != isFinal(j))
-                    separ[i][j] = true;
-                else
-                    separ[i][j] = false;
-            }
-        }
+        for (int i = 0; i < stateCount; i++)
+            for (int j = 0; j < stateCount; j++)
+                separ[i][j] = finalStates.contains(i) != finalStates.contains(j);
+
         boolean changed = true;
         while (changed) {
             changed = false;
             for (int i = 0; i < stateCount; i++) {
                 for (int j = i + 1; j < stateCount; j++) {
                     if (!separ[i][j]) {
-                        for (char c : simbolset) {
-                            int iDest = getDestination(i, c);
-                            int jDest = getDestination(j, c);
-                            boolean iTranz = (iDest >= 0);
-                            boolean jTranz = (jDest >= 0);
-                            if (!iTranz && !jTranz)
+                        for (char c : alphabet) {
+                            var iDest = getDestination(i, c);
+                            var jDest = getDestination(j, c);
+                            if (iDest.isEmpty() && jDest.isEmpty())
                                 continue;
-                            if (iTranz != jTranz) {
+                            if (iDest.isPresent() != jDest.isPresent()) {
                                 separ[i][j] = true;
                                 changed = true;
                                 continue;
                             }
-                            if (separ[iDest][jDest] || separ[jDest][iDest]) {
+                            if (separ[iDest.get()][jDest.get()] || separ[jDest.get()][iDest.get()]) {
                                 separ[i][j] = true;
                                 changed = true;
                             }
@@ -206,37 +125,22 @@ public class FSM {
                 }
             }
         }
-        int vechi = stateCount;
-
-        //
-        // Print
-        //
-        for (int i = 0; i < stateCount; i++) {
+        int oldCount = stateCount;
+        for (int i = 0; i < stateCount; i++)
             for (int j = i + 1; j < stateCount; j++)
-                System.out.print((separ[i][j] ? 1 : 0) + " ");
-            System.out.println();
-        }
-        //
-        // End print
-        //
-
-        for (int i = 0; i < stateCount; i++) {
-            for (int j = i + 1; j < stateCount; j++) {
                 if (!separ[i][j])
-                    mergeState(i - vechi + stateCount, j - vechi + stateCount);
-            }
-        }
+                    mergeState(i - oldCount + stateCount, j - oldCount + stateCount);
     }
 
     void print(Writer out) throws IOException {
-        out.write(stateCount + " " + Start + " " + finalStates.size() + "\n");
-        for (int i = 0; i < finalStates.size(); i++)
-            out.write(finalStates.get(i) + " ");
-        int transitionsCount = Arrays.stream(transitions).mapToInt(List::size).sum();
+        out.write(stateCount + " " + start + " " + finalStates.size() + "\n");
+        for (Integer finalState : finalStates)
+            out.write(finalState + " ");
+        int transitionsCount = Arrays.stream(transitions).mapToInt(Set::size).sum();
         out.write("\n" + transitionsCount + "\n");
         for (int i = 0; i < stateCount; i++)
-            for (int j = 0; j < transitions[i].size(); j++)
-                out.write(i + "\t" + transitions[i].get(j).destination + "\t" + transitions[i].get(j).symbol + "\n");
+            for (Transition t : transitions[i])
+                out.write(i + "\t" + t.destination + "\t" + t.symbol + "\n");
         out.flush();
     }
 
@@ -246,31 +150,26 @@ public class FSM {
         out.println("    node [fontname=\"Helvetica,Arial,sans-serif\"]");
         out.println("    edge [fontname=\"Helvetica,Arial,sans-serif\"]");
         out.println("    rankdir=LR;");
-        out.println("    node [shape = circle style=filled fillcolor=\"lightcyan\"]; " + Start + ";");
+        out.println("    node [shape = circle style=filled fillcolor=\"lightcyan\"]; " + start + ";");
         out.print("    node [shape = doublecircle style=filled fillcolor=\"navy\" fontcolor=\"white\"];");
-        for (int i = 0; i < finalStates.size(); i++)
-            out.print(" " + finalStates.get(i));
+        for (Integer finalState : finalStates)
+            out.print(" " + finalState);
         out.println(";");
         out.println("    node [shape = circle style=\"\" color=\"black\" fontcolor=\"black\"];");
 
         for (int i = 0; i < stateCount; i++)
-            for (int j = 0; j < transitions[i].size(); j++)
-                out.println("    " + i + " -> " + transitions[i].get(j).destination + " [label = \"" + transitions[i].get(j).symbol + "\"];");
+            for (Transition t : transitions[i])
+                out.println("    " + i + " -> " + t.destination + " [label = \"" + t.symbol + "\"];");
         out.println("}");
     }
 
     private record Transition(int destination, char symbol) {
     }
 
-
     public static void main(String[] args) {
         FSM initial = new FSM();
-        System.out.println("init ok");
         try {
-            System.out.println(System.getProperty("user.dir"));
-            System.out.println("before scanner");
             Scanner in = new Scanner(new File("legacy/date.in"));
-            System.out.println("before read");
             initial.read(in);
         } catch (Exception e) {
             System.out.println("Eroare");
@@ -281,5 +180,4 @@ public class FSM {
             throw new RuntimeException(e);
         }
     }
-
 }
