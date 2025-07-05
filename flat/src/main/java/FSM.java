@@ -33,10 +33,9 @@ public class FSM {
     void mergeState(int x, int y) { // x < y
         // redirect incoming into y towards x
         for (int i = 0; i < stateCount; i++)
-            for (int j = 0; j < transitions[i].size(); j++)
-                transitions[i] = transitions[i].stream()
-                        .map(t -> t.destination() == y ? new Transition(x, t.symbol()) : t)
-                        .collect(Collectors.toSet());
+            transitions[i] = transitions[i].stream()
+                    .map(t -> t.destination() == y ? new Transition(x, t.symbol()) : t)
+                    .collect(Collectors.toSet());
 
         // outgoings of y will start from x
         transitions[x] = Stream.concat(transitions[x].stream(), transitions[y].stream()).collect(Collectors.toSet());
@@ -132,6 +131,45 @@ public class FSM {
                     mergeState(i - oldCount + stateCount, j - oldCount + stateCount);
     }
 
+    void check(String src, PrintWriter out) {
+        Queue<Integer>[] coada = new LinkedList[2];
+        coada[0] = new LinkedList<>();
+        coada[1] = new LinkedList<>();
+        boolean[] IsInC = new boolean[100];
+        coada[1].add(0);
+        IsInC[0] = true;
+        int comp;
+        int dim = src.length();
+        int i;
+        for (i = 0; i < dim; i++) {
+            comp = (i + 1) % 2;
+            out.print(src.charAt(i) + ": ");
+            out.flush();
+            while (!coada[comp].isEmpty()) {
+                int crt = coada[comp].poll();
+                for (Transition transition : transitions[crt]) {
+                    if (transition.symbol == src.charAt(i) && !IsInC[transition.destination]) {
+                        out.print(transition.destination + " ");
+                        coada[i % 2].add(transition.destination);
+                        IsInC[transition.destination] = true;
+                    }
+                }
+            }
+            out.println();
+            out.flush();
+            Arrays.fill(IsInC, false);
+        }
+        comp = (i + 1) % 2;
+        while (!coada[comp].isEmpty()) {
+            int crt = coada[comp].poll();
+            if (finalStates.contains(crt)) {
+                out.println("Cuvant acceptat!");
+                return;
+            }
+        }
+        out.println("Cuvant respins!");
+    }
+
     void print(Writer out) throws IOException {
         out.write(stateCount + " " + start + " " + finalStates.size() + "\n");
         for (Integer finalState : finalStates)
@@ -175,7 +213,9 @@ public class FSM {
             System.out.println("Eroare");
         }
         try (PrintWriter out = new PrintWriter("graphviz.out")) {
-            initial.graphviz(out);
+//            initial.graphviz(out);
+            Scanner keyboardScanner = new Scanner(System.in);
+            initial.check(keyboardScanner.next(), new PrintWriter(System.out, true));
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
