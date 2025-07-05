@@ -2,16 +2,16 @@ import java.io.*;
 import java.util.*;
 
 public class FSM {
-    int stateCount, Start, finalStatesCount, transitionsCount;
-    Set<Character> simbolset = new HashSet<>();
-    List<Integer> finalStates = new ArrayList<>();
-    List<Transition>[] d;
+    private int stateCount, Start;
+    private Set<Character> simbolset = new HashSet<>();
+    private List<Integer> finalStates = new ArrayList<>();
+    private List<Transition>[] transitions;
 
     boolean find(int a, int b, char c) {
         System.out.println("find with a = " + a + ", b = " + b + ", c = " + c);
         Transition primita = new Transition(b, c);
-        for (int i = 0; i < d[a].size(); i++)
-            if (d[a].get(i).equals(primita)) {
+        for (int i = 0; i < transitions[a].size(); i++)
+            if (transitions[a].get(i).equals(primita)) {
                 System.out.println("find ok");
                 return true;
             }
@@ -23,26 +23,25 @@ public class FSM {
     void removeState(int x) {
         // Remove all transitions to state x and update destination indices
         for (int i = 0; i < stateCount; i++) {
-            for (int j = 0; j < d[i].size(); j++) {
-                if (d[i].get(j).destination == x) {
-                    d[i].remove(j);
-                    transitionsCount--;
+            for (int j = 0; j < transitions[i].size(); j++) {
+                if (transitions[i].get(j).destination == x) {
+                    transitions[i].remove(j);
                     j--;
-                } else if (d[i].get(j).destination > x) {
-                    var temp = new Transition(d[i].get(j).destination - 1, d[i].get(j).symbol);
-                    d[i].set(j, temp);
+                } else if (transitions[i].get(j).destination > x) {
+                    var temp = new Transition(transitions[i].get(j).destination - 1, transitions[i].get(j).symbol);
+                    transitions[i].set(j, temp);
                 }
             }
         }
-        transitionsCount -= d[x].size();
-        d[x].clear();
+        transitions[x].clear();
         // Shift states after x
         for (int i = x + 1; i < stateCount; i++) {
-            List<Transition> temp = d[i];
-            d[i] = d[i - 1];
-            d[i - 1] = temp;
+            List<Transition> temp = transitions[i];
+            transitions[i] = transitions[i - 1];
+            transitions[i - 1] = temp;
         }
         // Update final states
+        int finalStatesCount = finalStates.size();
         for (int i = 0; i < finalStatesCount; i++) {
             if (finalStates.get(i) > x) {
                 finalStates.set(i, finalStates.get(i) - 1);
@@ -58,34 +57,33 @@ public class FSM {
     void mergeState(int x, int y) { // x < y
         // Update transitions: redirect y to x, decrement destinations > y
         for (int i = 0; i < stateCount; i++) {
-            for (int j = 0; j < d[i].size(); j++) {
-                if (d[i].get(j).destination == y) {
-                    Transition updated = new Transition(x, d[i].get(j).symbol);
-                    d[i].set(j, updated);
-                } else if (d[i].get(j).destination > y) {
-                    Transition updated = new Transition(d[i].get(j).destination - 1, d[i].get(j).symbol);
-                    d[i].set(j, updated);
+            for (int j = 0; j < transitions[i].size(); j++) {
+                if (transitions[i].get(j).destination == y) {
+                    Transition updated = new Transition(x, transitions[i].get(j).symbol);
+                    transitions[i].set(j, updated);
+                } else if (transitions[i].get(j).destination > y) {
+                    Transition updated = new Transition(transitions[i].get(j).destination - 1, transitions[i].get(j).symbol);
+                    transitions[i].set(j, updated);
                 }
             }
         }
         // Move transitions from y to x, avoid duplicates
-        while (!d[y].isEmpty()) {
-            Transition temp = d[y].get(d[y].size() - 1);
-            d[y].remove(d[y].size() - 1);
-            if (d[x].contains(temp)) {
-                transitionsCount--;
-            } else {
-                d[x].add(temp);
+        while (!transitions[y].isEmpty()) {
+            Transition temp = transitions[y].get(transitions[y].size() - 1);
+            transitions[y].remove(transitions[y].size() - 1);
+            if (!transitions[x].contains(temp)) {
+                transitions[x].add(temp);
             }
         }
-        d[y].clear();
+        transitions[y].clear();
         // Shift states after y
         for (int i = y + 1; i < stateCount; i++) {
-            List<Transition> tmp = d[i];
-            d[i] = d[i - 1];
-            d[i - 1] = tmp;
+            List<Transition> tmp = transitions[i];
+            transitions[i] = transitions[i - 1];
+            transitions[i - 1] = tmp;
         }
         // Update final states
+        int finalStatesCount = finalStates.size();
         for (int i = 0; i < finalStatesCount; i++) {
             if (finalStates.get(i) > y) {
                 finalStates.set(i, finalStates.get(i) - 1);
@@ -99,9 +97,9 @@ public class FSM {
     }
 
     int getDestination(int x, char c) {
-        for (int i = 0; i < d[x].size(); i++) {
-            if (d[x].get(i).symbol == c)
-                return d[x].get(i).destination;
+        for (int i = 0; i < transitions[x].size(); i++) {
+            if (transitions[x].get(i).symbol == c)
+                return transitions[x].get(i).destination;
         }
         return -1;
     }
@@ -122,25 +120,25 @@ public class FSM {
         stateCount = in.nextInt();
         System.out.println("after states count");
         Start = in.nextInt();
-        finalStatesCount = in.nextInt();
+        int finalStatesCount = in.nextInt();
         for (int i = 1; i <= finalStatesCount; i++) {
             b = in.nextInt();
             finalStates.add(b);
         }
 
         System.out.println("before read transitions");
-        transitionsCount = in.nextInt();
-        d = new ArrayList[stateCount + 1];
+        transitions = new ArrayList[stateCount + 1];
         for(int i = 0; i <= stateCount; i++) {
-            d[i] = new ArrayList<>();
+            transitions[i] = new ArrayList<>();
         }
+        int transitionsCount = in.nextInt();
         for (int i = 1; i <= transitionsCount; i++) {
             a = in.nextInt();
             b = in.nextInt();
             c = in.next().charAt(0);
             if (find(a, b, c))
                 throw new RuntimeException("Duplicate transition");
-            var initialNode = d[a];
+            var initialNode = transitions[a];
             initialNode.add(new Transition(b, c));
             simbolset.add(c);
         }
@@ -158,10 +156,10 @@ public class FSM {
         reach[Start] = true;
         while (!q.isEmpty()) {
             int x = q.poll();
-            for (int i = 0; i < d[x].size(); i++) {
-                if (!reach[d[x].get(i).destination]) {
-                    reach[d[x].get(i).destination] = true;
-                    q.add(d[x].get(i).destination);
+            for (int i = 0; i < transitions[x].size(); i++) {
+                if (!reach[transitions[x].get(i).destination]) {
+                    reach[transitions[x].get(i).destination] = true;
+                    q.add(transitions[x].get(i).destination);
                 }
             }
         }
@@ -231,13 +229,14 @@ public class FSM {
     }
 
     void print(Writer out) throws IOException {
-        out.write(stateCount + " " + Start + " " + finalStatesCount + "\n");
-        for (int i = 0; i < finalStatesCount; i++)
+        out.write(stateCount + " " + Start + " " + finalStates.size() + "\n");
+        for (int i = 0; i < finalStates.size(); i++)
             out.write(finalStates.get(i) + " ");
+        int transitionsCount = Arrays.stream(transitions).mapToInt(List::size).sum();
         out.write("\n" + transitionsCount + "\n");
         for (int i = 0; i < stateCount; i++)
-            for (int j = 0; j < d[i].size(); j++)
-                out.write(i + "\t" + d[i].get(j).destination + "\t" + d[i].get(j).symbol + "\n");
+            for (int j = 0; j < transitions[i].size(); j++)
+                out.write(i + "\t" + transitions[i].get(j).destination + "\t" + transitions[i].get(j).symbol + "\n");
         out.flush();
     }
 
@@ -249,14 +248,14 @@ public class FSM {
         out.println("    rankdir=LR;");
         out.println("    node [shape = circle style=filled fillcolor=\"lightcyan\"]; " + Start + ";");
         out.print("    node [shape = doublecircle style=filled fillcolor=\"navy\" fontcolor=\"white\"];");
-        for (int i = 0; i < finalStatesCount; i++)
+        for (int i = 0; i < finalStates.size(); i++)
             out.print(" " + finalStates.get(i));
         out.println(";");
         out.println("    node [shape = circle style=\"\" color=\"black\" fontcolor=\"black\"];");
 
         for (int i = 0; i < stateCount; i++)
-            for (int j = 0; j < d[i].size(); j++)
-                out.println("    " + i + " -> " + d[i].get(j).destination + " [label = \"" + d[i].get(j).symbol + "\"];");
+            for (int j = 0; j < transitions[i].size(); j++)
+                out.println("    " + i + " -> " + transitions[i].get(j).destination + " [label = \"" + transitions[i].get(j).symbol + "\"];");
         out.println("}");
     }
 
@@ -284,4 +283,3 @@ public class FSM {
     }
 
 }
-
