@@ -42,11 +42,17 @@ public class FSM {
         removeState(y);
     }
 
-    Optional<Integer> getDestination(int x, char c) {
-        return transitions[x].stream()
-                .filter(t -> t.symbol() == c)
+    Optional<Integer> getDestination(int state, char symbol) {
+        return transitions[state].stream()
+                .filter(t -> t.symbol() == symbol)
                 .map(Transition::destination)
                 .findFirst();
+    }
+
+    Stream<Integer> getAllDestinations(int state, char symbol) {
+        return transitions[state].stream()
+                .filter(t -> t.symbol() == symbol)
+                .map(Transition::destination);
     }
 
     public void read(Scanner in) throws IOException {
@@ -69,8 +75,6 @@ public class FSM {
             transitions[from].add(new Transition(to, symbol));
             alphabet.add(symbol);
         }
-        if (transitionsCount != stateCount * alphabet.size())
-            throw new RuntimeException("Invalid DFA: not complete");
     }
 
     void removeUnreachableStates() {
@@ -132,42 +136,23 @@ public class FSM {
     }
 
     void check(String src, PrintWriter out) {
-        Queue<Integer>[] coada = new LinkedList[2];
-        coada[0] = new LinkedList<>();
-        coada[1] = new LinkedList<>();
-        boolean[] IsInC = new boolean[100];
-        coada[1].add(0);
-        IsInC[0] = true;
-        int comp;
-        int dim = src.length();
-        int i;
-        for (i = 0; i < dim; i++) {
-            comp = (i + 1) % 2;
+        Set<Integer> crtStates = Set.of(start);
+        for (int i = 0; i < src.length(); i++) {
+            char crtChar = src.charAt(i);
+            Set<Integer> newStates = crtStates.stream()
+                    .flatMap(crt -> getAllDestinations(crt, crtChar))
+                    .collect(Collectors.toSet());
+
             out.print(src.charAt(i) + ": ");
-            out.flush();
-            while (!coada[comp].isEmpty()) {
-                int crt = coada[comp].poll();
-                for (Transition transition : transitions[crt]) {
-                    if (transition.symbol == src.charAt(i) && !IsInC[transition.destination]) {
-                        out.print(transition.destination + " ");
-                        coada[i % 2].add(transition.destination);
-                        IsInC[transition.destination] = true;
-                    }
-                }
-            }
+            newStates.forEach(e -> out.print(e + " "));
             out.println();
             out.flush();
-            Arrays.fill(IsInC, false);
+            crtStates = newStates;
         }
-        comp = (i + 1) % 2;
-        while (!coada[comp].isEmpty()) {
-            int crt = coada[comp].poll();
-            if (finalStates.contains(crt)) {
-                out.println("Cuvant acceptat!");
-                return;
-            }
-        }
-        out.println("Cuvant respins!");
+
+        boolean accepted = crtStates.stream().anyMatch(s -> finalStates.contains(s));
+        if (accepted) out.println("Cuvant acceptat!");
+        else out.println("Cuvant respins!");
     }
 
     void print(Writer out) throws IOException {
@@ -207,7 +192,7 @@ public class FSM {
     public static void main(String[] args) {
         FSM initial = new FSM();
         try {
-            Scanner in = new Scanner(new File("legacy/date.in"));
+            Scanner in = new Scanner(new File("legacy/test-data/NFA2DFAdate.fsm"));
             initial.read(in);
         } catch (Exception e) {
             System.out.println("Eroare");
