@@ -14,6 +14,7 @@ public class Autom {
     boolean[] finalStates = new boolean[N];
     char lambdaSymbol = 'l';
     int[] cod = new int[N];
+    Set<Character> alphabet = new HashSet<>();
 
     public Autom(char chr) {
         stateCount = 2;
@@ -112,6 +113,44 @@ public class Autom {
             crt = lamd(getDestinations(crt, c));
         }
         return crt.stream().anyMatch(state -> finalStates[state]);
+    }
+
+    int getOrAssignCode(ArrayList<Set<Integer>> codArr, Set<Integer> codValue, Autom dfa, Autom nfa) {
+        for (int i = 0; i < codArr.size(); i++) {
+            if (codValue.equals(codArr.get(i)))
+                return i;
+        }
+        int idx = codArr.size();
+        codArr.add(codValue);
+        boolean isFinal = codValue.stream().anyMatch(x -> nfa.finalStates[x]);
+        if (isFinal) {
+            dfa.finalStates[idx] = true;
+            dfa.finalStatesCount++;
+        }
+        return idx;
+    }
+
+    void transforma(Autom dfa, Autom nfa) {
+        var ini = new ArrayList<Set<Integer>>();
+        Set<Integer> crt = nfa.lamd(Set.of(nfa.start));
+        getOrAssignCode(ini, crt, dfa, nfa);
+        int idx = 0;
+        while (idx <= ini.size()) {
+            crt = ini.get(idx);
+            for (char sim : nfa.alphabet) {
+                if (sim == 'l') continue;
+                Set<Integer> dest = crt;
+                dest = nfa.lamd(dest);
+                dest = nfa.getDestinations(dest, sim);
+                dest = nfa.lamd(dest);
+                if (dest.isEmpty()) continue;
+                Transition noua = new Transition(getOrAssignCode(ini, dest, dfa, nfa), sim);
+                dfa.transitions[idx].add(noua);
+                dfa.transitionsCount++;
+            }
+            idx++;
+        }
+        dfa.stateCount = ini.size();
     }
 
     public static void main(String[] args) throws IOException {
