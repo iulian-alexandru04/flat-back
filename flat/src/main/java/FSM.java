@@ -97,31 +97,25 @@ public class FSM {
                 removeState(i + stateCount - oldCount);
     }
 
-    void separabile() {
-        boolean[][] separ = new boolean[stateCount + 1][stateCount + 1];
-        for (int i = 0; i < stateCount; i++)
-            for (int j = 0; j < stateCount; j++)
-                separ[i][j] = finalStates.contains(i) != finalStates.contains(j);
+    void minimize() {
+        boolean[][] distinguishable = new boolean[stateCount + 1][stateCount + 1]; // include the black hole state
+        for (int i = 0; i <= stateCount; i++)
+            for (int j = 0; j <= stateCount; j++)
+                distinguishable[i][j] = finalStates.contains(i) != finalStates.contains(j);
 
         boolean changed = true;
         while (changed) {
             changed = false;
-            for (int i = 0; i < stateCount; i++) {
-                for (int j = i + 1; j < stateCount; j++) {
-                    if (!separ[i][j]) {
+            for (int i = 0; i <= stateCount; i++) {
+                for (int j = i + 1; j <= stateCount; j++) {
+                    if (!distinguishable[i][j]) {
                         for (char c : alphabet) {
-                            var iDest = getDestination(i, c);
-                            var jDest = getDestination(j, c);
-                            if (iDest.isEmpty() && jDest.isEmpty())
-                                continue;
-                            if (iDest.isPresent() != jDest.isPresent()) {
-                                separ[i][j] = true;
+                            var iDest = getDestination(i, c).orElse(stateCount);
+                            var jDest = getDestination(j, c).orElse(stateCount);
+                            if (distinguishable[iDest][jDest] || distinguishable[jDest][iDest]) {
+                                distinguishable[i][j] = true;
                                 changed = true;
-                                continue;
-                            }
-                            if (separ[iDest.get()][jDest.get()] || separ[jDest.get()][iDest.get()]) {
-                                separ[i][j] = true;
-                                changed = true;
+                                break;
                             }
                         }
                     }
@@ -131,28 +125,21 @@ public class FSM {
         int oldCount = stateCount;
         for (int i = 0; i < stateCount; i++)
             for (int j = i + 1; j < stateCount; j++)
-                if (!separ[i][j])
+                if (!distinguishable[i][j])
                     mergeState(i - oldCount + stateCount, j - oldCount + stateCount);
     }
 
-    void check(String src, PrintWriter out) {
+    boolean check(String src, PrintWriter out) {
         Set<Integer> crtStates = Set.of(start);
-        for (int i = 0; i < src.length(); i++) {
-            char crtChar = src.charAt(i);
-            Set<Integer> newStates = crtStates.stream()
-                    .flatMap(crt -> getAllDestinations(crt, crtChar))
+        for (char crtChar : src.toCharArray()) {
+            crtStates = crtStates.stream()
+                    .flatMap(state -> getAllDestinations(state, crtChar))
                     .collect(Collectors.toSet());
 
-            out.print(src.charAt(i) + ": ");
-            newStates.forEach(e -> out.print(e + " "));
-            out.println();
+            out.printf("%c: %s%n", crtChar, crtStates);
             out.flush();
-            crtStates = newStates;
         }
-
-        boolean accepted = crtStates.stream().anyMatch(s -> finalStates.contains(s));
-        if (accepted) out.println("Cuvant acceptat!");
-        else out.println("Cuvant respins!");
+        return !Collections.disjoint(crtStates, finalStates);
     }
 
     void print(Writer out) throws IOException {
@@ -186,8 +173,7 @@ public class FSM {
         out.println("}");
     }
 
-    private record Transition(int destination, char symbol) {
-    }
+    private record Transition(int destination, char symbol) { }
 
     public static void main(String[] args) {
         FSM initial = new FSM();
@@ -200,7 +186,9 @@ public class FSM {
         try (PrintWriter out = new PrintWriter("graphviz.out")) {
 //            initial.graphviz(out);
             Scanner keyboardScanner = new Scanner(System.in);
-            initial.check(keyboardScanner.next(), new PrintWriter(System.out, true));
+            var accepted = initial.check(keyboardScanner.next(), new PrintWriter(System.out, true));
+            if (accepted) out.println("Accepted!");
+            else out.println("Rejected!");
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
