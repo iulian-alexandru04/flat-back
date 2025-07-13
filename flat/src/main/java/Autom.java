@@ -9,20 +9,17 @@ public class Autom {
     }
 
     final static int N = 100;
-    int stateCount, start, finalStatesCount, transitionsCount;
+    int stateCount, start;
+    Set<Character> alphabet = new HashSet<>();
+    Set<Integer> finalStates = new HashSet<>();
     List<Transition>[] transitions = new ArrayList[N];
-    boolean[] finalStates = new boolean[N];
     char lambdaSymbol = 'l';
     int[] cod = new int[N];
-    Set<Character> alphabet = new HashSet<>();
 
     public Autom(char chr) {
         stateCount = 2;
         start = 0;
-        finalStatesCount = 1;
-        finalStates[0] = false;
-        finalStates[1] = true;
-        transitionsCount = 1;
+        finalStates.add(1);
         transitions[0] = new ArrayList<>();
         transitions[1] = new ArrayList<>();
         transitions[0].add(new Transition(1, chr));
@@ -31,20 +28,16 @@ public class Autom {
 
     public static Autom star(Autom fsm) {
         for (int i = 0; i < fsm.stateCount; i++) {
-            if (fsm.finalStates[i]) {
+            if (fsm.finalStates.contains(i)) {
                 Transition noua = new Transition(fsm.start, fsm.lambdaSymbol);
                 fsm.transitions[i].add(noua);
-                fsm.transitionsCount++;
             }
         }
-        fsm.finalStates[fsm.start] = true;
-        fsm.finalStatesCount++;
+        fsm.finalStates.add(fsm.start);
         return fsm;
     }
 
     public static Autom concat(Autom fsm1, Autom fsm2) {
-        fsm1.finalStatesCount = fsm2.finalStatesCount;
-        fsm1.transitionsCount += fsm2.transitionsCount;
         for (int i = 0; i < fsm2.stateCount; i++) {
             for (int j = 0; j < fsm2.transitions[i].size(); j++) {
                 Transition l = fsm2.transitions[i].get(j);
@@ -52,26 +45,23 @@ public class Autom {
             }
         }
         for (int i = 0; i < fsm1.stateCount; i++) {
-            if (fsm1.finalStates[i]) {
+            if (fsm1.finalStates.contains(i)) {
                 fsm1.transitions[i].add(new Transition(fsm2.start + fsm1.stateCount, 'l'));
-                fsm1.transitionsCount++;
             }
         }
-        fsm1.finalStates = new boolean[N];
+        fsm1.finalStates.clear();
         for (int i = 0; i < fsm2.stateCount; i++) {
-            if (fsm2.finalStates[i])
-                fsm1.finalStates[i + fsm1.stateCount] = true;
+            if (fsm2.finalStates.contains(i))
+                fsm1.finalStates.add(i + fsm1.stateCount);
         }
         fsm1.stateCount += fsm2.stateCount;
         return fsm1;
     }
 
     public static Autom paralel(Autom fsm1, Autom fsm2) {
-        fsm1.finalStatesCount += fsm2.finalStatesCount;
-        fsm1.transitionsCount += fsm2.transitionsCount;
         for (int i = 0; i < fsm2.stateCount; i++) {
-            if (fsm2.finalStates[i])
-                fsm1.finalStates[i + fsm1.stateCount] = true;
+            if (fsm2.finalStates.contains(i))
+                fsm1.finalStates.add(i + fsm1.stateCount);
         }
         for (int i = 0; i < fsm2.stateCount; i++) {
             for (int j = 0; j < fsm2.transitions[i].size(); j++) {
@@ -81,7 +71,6 @@ public class Autom {
         }
         fsm1.transitions[fsm1.stateCount + fsm2.stateCount].add(new Transition(fsm1.start, 'l'));
         fsm1.transitions[fsm1.stateCount + fsm2.stateCount].add(new Transition(fsm2.start + fsm1.stateCount, 'l'));
-        fsm1.transitionsCount += 2;
         fsm1.stateCount += fsm2.stateCount;
         fsm1.start = fsm1.stateCount++;
         return fsm1;
@@ -97,8 +86,7 @@ public class Autom {
                 .map(t -> t.destination);
     }
 
-    Set<Integer> lamd(Set<Integer> states)
-    {
+    Set<Integer> lamd(Set<Integer> states) {
         Set<Integer> prevStates;
         do {
             prevStates = new HashSet<>(states);
@@ -109,10 +97,10 @@ public class Autom {
 
     boolean checkWord(String word) {
         Set<Integer> crt = lamd(Set.of(start));
-        for(char c : word.toCharArray()) {
+        for (char c : word.toCharArray()) {
             crt = lamd(getDestinations(crt, c));
         }
-        return crt.stream().anyMatch(state -> finalStates[state]);
+        return !Collections.disjoint(crt, finalStates);
     }
 
     int getOrAssignCode(ArrayList<Set<Integer>> codArr, Set<Integer> codValue, Autom dfa, Autom nfa) {
@@ -122,10 +110,9 @@ public class Autom {
         }
         int idx = codArr.size();
         codArr.add(codValue);
-        boolean isFinal = codValue.stream().anyMatch(x -> nfa.finalStates[x]);
+        boolean isFinal = codValue.stream().anyMatch(x -> nfa.finalStates.contains(x));
         if (isFinal) {
-            dfa.finalStates[idx] = true;
-            dfa.finalStatesCount++;
+            dfa.finalStates.add(idx);
         }
         return idx;
     }
@@ -146,7 +133,6 @@ public class Autom {
                 if (dest.isEmpty()) continue;
                 Transition noua = new Transition(getOrAssignCode(ini, dest, dfa, nfa), sim);
                 dfa.transitions[idx].add(noua);
-                dfa.transitionsCount++;
             }
             idx++;
         }
