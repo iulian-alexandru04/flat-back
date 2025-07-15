@@ -45,7 +45,6 @@ public class FSM {
         return fsm1;
     }
 
-
     public static FSM paralel(FSM fsm1, FSM fsm2) {
         for (int i : fsm2.finalStates)
             fsm1.finalStates.add(i + fsm1.stateCount);
@@ -61,22 +60,11 @@ public class FSM {
         return fsm1;
     }
 
-
-    Set<Integer> getDestinations(Set<Integer> states, char c) {
-        return states.stream().flatMap(s -> getDestinations(s, c)).collect(Collectors.toSet());
-    }
-
-    Stream<Integer> getDestinations(int state, char c) {
-        return transitions[state].stream()
-                .filter(t -> t.symbol == c)
-                .map(t -> t.destination);
-    }
-
     Set<Integer> lamd(Set<Integer> states) {
         Set<Integer> prevStates;
         do {
             prevStates = new HashSet<>(states);
-            states.addAll(getDestinations(states, lambdaSymbol));
+            states.addAll(getAllDestinations(states, lambdaSymbol));
         } while (!states.equals(prevStates));
         return states;
     }
@@ -84,11 +72,10 @@ public class FSM {
     boolean checkWord(String word) {
         Set<Integer> crt = lamd(Set.of(start));
         for (char c : word.toCharArray()) {
-            crt = lamd(getDestinations(crt, c));
+            crt = lamd(getAllDestinations(crt, c));
         }
         return !Collections.disjoint(crt, finalStates);
     }
-
 
     int getOrAssignCode(ArrayList<Set<Integer>> codArr, Set<Integer> codValue, FSM dfa, FSM nfa) {
         int i = codArr.indexOf(codValue);
@@ -113,7 +100,7 @@ public class FSM {
                 if (sim == 'l') continue;
                 Set<Integer> dest = crt;
                 dest = nfa.lamd(dest);
-                dest = nfa.getDestinations(dest, sim);
+                dest = nfa.getAllDestinations(dest, sim);
                 dest = nfa.lamd(dest);
                 if (dest.isEmpty()) continue;
                 Transition noua = new Transition(getOrAssignCode(ini, dest, dfa, nfa), sim);
@@ -157,17 +144,18 @@ public class FSM {
         removeState(y);
     }
 
-    Optional<Integer> getDestination(int state, char symbol) {
-        return transitions[state].stream()
-                .filter(t -> t.symbol() == symbol)
-                .map(Transition::destination)
-                .findFirst();
-    }
-
     Stream<Integer> getAllDestinations(int state, char symbol) {
         return transitions[state].stream()
                 .filter(t -> t.symbol() == symbol)
                 .map(Transition::destination);
+    }
+
+    Optional<Integer> getDestination(int state, char symbol) {
+        return getAllDestinations(state, symbol).findFirst();
+    }
+
+    Set<Integer> getAllDestinations(Set<Integer> states, char symbol) {
+        return states.stream().flatMap(s -> getAllDestinations(s, symbol)).collect(Collectors.toSet());
     }
 
     public void read(Scanner in) throws IOException {
@@ -288,7 +276,8 @@ public class FSM {
         out.println("}");
     }
 
-    private record Transition(int destination, char symbol) { }
+    private record Transition(int destination, char symbol) {
+    }
 
     public static void main(String[] args) {
         FSM initial = new FSM();
