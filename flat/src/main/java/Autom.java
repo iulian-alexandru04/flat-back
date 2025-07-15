@@ -8,67 +8,53 @@ public class Autom {
     private record Transition(int destination, char symbol) {
     }
 
-    final static int N = 100;
     int stateCount, start;
     Set<Character> alphabet = new HashSet<>();
     Set<Integer> finalStates = new HashSet<>();
-    List<Transition>[] transitions = new ArrayList[N];
+    Set<Transition>[] transitions = new Set[100];
     char lambdaSymbol = 'l';
-    int[] cod = new int[N];
 
     public Autom(char chr) {
         stateCount = 2;
         start = 0;
         finalStates.add(1);
-        transitions[0] = new ArrayList<>();
-        transitions[1] = new ArrayList<>();
+        transitions[0] = new HashSet<>();
+        transitions[1] = new HashSet<>();
         transitions[0].add(new Transition(1, chr));
         lambdaSymbol = 'l';
     }
 
     public static Autom star(Autom fsm) {
-        for (int i = 0; i < fsm.stateCount; i++) {
-            if (fsm.finalStates.contains(i)) {
-                Transition noua = new Transition(fsm.start, fsm.lambdaSymbol);
-                fsm.transitions[i].add(noua);
-            }
-        }
+        Transition toStart = new Transition(fsm.start, fsm.lambdaSymbol);
+        for (int i : fsm.finalStates)
+            fsm.transitions[i].add(toStart);
         fsm.finalStates.add(fsm.start);
         return fsm;
     }
 
     public static Autom concat(Autom fsm1, Autom fsm2) {
-        for (int i = 0; i < fsm2.stateCount; i++) {
-            for (int j = 0; j < fsm2.transitions[i].size(); j++) {
-                Transition l = fsm2.transitions[i].get(j);
+        for (int i = 0; i < fsm2.stateCount; i++)
+            for (Transition l : fsm2.transitions[i])
                 fsm1.transitions[i + fsm1.stateCount].add(new Transition(l.destination + fsm1.stateCount, l.symbol));
-            }
-        }
-        for (int i = 0; i < fsm1.stateCount; i++) {
-            if (fsm1.finalStates.contains(i)) {
-                fsm1.transitions[i].add(new Transition(fsm2.start + fsm1.stateCount, 'l'));
-            }
-        }
-        fsm1.finalStates.clear();
-        for (int i = 0; i < fsm2.stateCount; i++) {
-            if (fsm2.finalStates.contains(i))
-                fsm1.finalStates.add(i + fsm1.stateCount);
-        }
+
+        Transition toFSM2Start = new Transition(fsm2.start + fsm1.stateCount, 'l');
+        for (int i : fsm1.finalStates)
+            fsm1.transitions[i].add(toFSM2Start);
+
+        fsm1.finalStates = new HashSet<>(fsm2.finalStates.stream().map(s -> s + fsm1.stateCount).collect(Collectors.toSet()));
+
         fsm1.stateCount += fsm2.stateCount;
         return fsm1;
     }
 
     public static Autom paralel(Autom fsm1, Autom fsm2) {
-        for (int i = 0; i < fsm2.stateCount; i++) {
-            if (fsm2.finalStates.contains(i))
-                fsm1.finalStates.add(i + fsm1.stateCount);
-        }
-        for (int i = 0; i < fsm2.stateCount; i++) {
-            for (int j = 0; j < fsm2.transitions[i].size(); j++) {
-                Transition l = fsm2.transitions[i].get(j);
+        for (int i : fsm2.finalStates)
+            fsm1.finalStates.add(i + fsm1.stateCount);
+
+        for (int i = 0; i < fsm2.stateCount; i++)
+            for (Transition l : fsm2.transitions[i])
                 fsm1.transitions[i + fsm1.stateCount].add(new Transition(l.destination + fsm1.stateCount, l.symbol));
-            }
-        }
+
         fsm1.transitions[fsm1.stateCount + fsm2.stateCount].add(new Transition(fsm1.start, 'l'));
         fsm1.transitions[fsm1.stateCount + fsm2.stateCount].add(new Transition(fsm2.start + fsm1.stateCount, 'l'));
         fsm1.stateCount += fsm2.stateCount;
@@ -104,16 +90,14 @@ public class Autom {
     }
 
     int getOrAssignCode(ArrayList<Set<Integer>> codArr, Set<Integer> codValue, Autom dfa, Autom nfa) {
-        for (int i = 0; i < codArr.size(); i++) {
-            if (codValue.equals(codArr.get(i)))
-                return i;
-        }
+        int i = codArr.indexOf(codValue);
+        if (i != -1)
+            return i;
+
         int idx = codArr.size();
         codArr.add(codValue);
-        boolean isFinal = codValue.stream().anyMatch(x -> nfa.finalStates.contains(x));
-        if (isFinal) {
+        if (codValue.stream().anyMatch(nfa.finalStates::contains))
             dfa.finalStates.add(idx);
-        }
         return idx;
     }
 
